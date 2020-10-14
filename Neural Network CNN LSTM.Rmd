@@ -1,0 +1,175 @@
+---
+title: "Untitled"
+output: html_document
+---
+#https://www.shirin-glander.de/2019/01/text_classification_keras_data_prep/
+#
+---
+title: "Neural Network 2"
+output: html_document
+---
+
+```{r}
+library(keras)
+library(tidyverse)
+
+```
+
+```{r}
+loading_data <- function(path) {
+  read_delim(path, "\t", escape_double = FALSE, trim_ws = TRUE)
+}
+
+training <- loading_data("offenseval-da-training-v1.tsv") %>% 
+          mutate(Id = id,tag = factor(subtask_a),text=tweet) %>% 
+          na.omit()
+
+testing<-loading_data("offenseval-da-test-v1.tsv") %>% 
+          mutate(Id = id,tag = factor(subtask_a),text=tweet) %>% 
+          na.omit()
+
+
+training<-training[,4:6]
+testing<-testing[,4:6]
+
+training$tag<-as.numeric(training$tag)-1
+testing$tag<-as.numeric(testing$tag)-1
+
+glimpse(training)
+
+
+###
+
+```
+
+```{r}
+#train
+
+text <- training$text
+
+max_features <- 1000
+tokenizer <- text_tokenizer(num_words = max_features)
+
+#test
+
+text_test <- testing$text
+
+max_features_test <- 1000
+tokenizer_test <- text_tokenizer(num_words = max_features)
+```
+
+```{r}
+#Train
+tokenizer %>% 
+  fit_text_tokenizer(text)
+
+#Test
+tokenizer_test %>% 
+  fit_text_tokenizer(text_test)
+```
+
+```{r}
+tokenizer$document_count
+tokenizer_test$document_count
+
+```
+
+```{r}
+tokenizer$word_index %>%
+  head()
+
+tokenizer_test$word_index %>%
+  head()
+
+```
+
+```{r}
+text_seqs <- texts_to_sequences(tokenizer, text)
+
+text_seqs %>%
+  head()
+
+#Test
+text_seqs_test <- texts_to_sequences(tokenizer_test, text_test)
+
+text_seqs_test %>%
+  head()
+```
+
+
+```{r}
+##
+maxlen <- 100
+batch_size <- 32
+embedding_dims <- 50
+filters <- 64
+kernel_size <- 3
+hidden_dims <- 50
+epochs <- 5
+
+```
+
+```{r}
+x_train <- text_seqs %>%
+  pad_sequences(maxlen = maxlen)
+dim(x_train)
+
+#Test
+x_test <- text_seqs_test %>%
+  pad_sequences(maxlen = maxlen)
+dim(x_test)
+```
+
+```{r}
+y_train <- training$tag
+length(y_train)
+
+#Test
+y_test <- testing$tag
+length(y_test)
+
+y_test<-y_test
+y_train<-y_train
+```
+
+```{r}
+model <- keras_model_sequential()
+model %>%
+  layer_embedding(input_dim = max_features, output_dim = 128) %>% 
+  layer_lstm(units = 64, dropout = 0.2, recurrent_dropout = 0.2) %>% 
+  layer_dense(units = 1, activation = 'sigmoid')
+
+```
+
+```{r}
+# Try using different optimizers and different optimizer configs
+model %>% compile(
+  loss = 'binary_crossentropy',
+  optimizer = 'adam',
+  metrics = c('accuracy','Precision','Recall')
+)
+```
+
+```{r}
+model %>% fit(
+  x_train, y_train,
+  batch_size = batch_size,
+  epochs = 15,
+  validation_data = list(x_test, y_test)
+
+)
+```
+
+```{r}
+scores <- model %>% evaluate(
+  x_test, y_test,
+  batch_size = batch_size
+)
+
+
+
+y_test
+
+testing$predict<-predict_classes(model, testing$tag)
+```
+
