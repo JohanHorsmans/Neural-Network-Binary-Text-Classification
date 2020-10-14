@@ -1,0 +1,111 @@
+---
+title: "Neural Network Binary Text Classification"
+output: html_document
+---
+
+#https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_text_classification/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#keras::install_keras() #Install python keras library
+library(keras) 
+library(readr)
+
+
+```
+
+```{r}
+df <- readr::read_csv("movie_review.csv")
+head(df)
+df %>% count(tag)
+```
+
+```{r}
+training_id <- sample.int(nrow(df), size = nrow(df)*0.8)
+training <- df[training_id,]
+testing <- df[-training_id,]
+```
+
+```{r}
+df$text %>% 
+  strsplit(" ") %>% 
+  sapply(length) %>% 
+  summary()
+```
+
+```{r}
+num_words <- 10000
+max_length <- 50
+text_vectorization <- layer_text_vectorization(
+  max_tokens = num_words, 
+  output_sequence_length = max_length, 
+)
+
+text_vectorization %>% 
+  adapt(df$text)
+
+get_vocabulary(text_vectorization)
+
+
+text_vectorization(matrix(df$text[1], ncol = 1))
+```
+
+```{r}
+input <- layer_input(shape = c(1), dtype = "string")
+
+output <- input %>% 
+  text_vectorization() %>% 
+  layer_embedding(input_dim = num_words + 1, output_dim = 16) %>%
+  layer_global_average_pooling_1d() %>%
+  layer_dense(units = 16, activation = "relu") %>%
+  layer_dropout(0.5) %>% 
+  layer_dense(units = 1, activation = "sigmoid")
+
+?keras_model
+
+model <- keras_model(input, output)
+```
+
+```{r}
+model %>% compile(
+  optimizer = 'adam',
+  loss = 'binary_crossentropy',
+  metrics = list('accuracy')
+)
+
+```
+
+```{r}
+history <- model %>% fit(
+  training$text,
+  as.numeric(training$tag == "pos"),
+  epochs = 10,
+  batch_size = 512,
+  validation_split = 0.2,
+  verbose=2
+)
+```
+
+```{r}
+predict<-model %>% predict(testing$text,verbose=0,type="matrix")
+
+log.prediction.rd <- ifelse(predict > 0.5, 1, 0)
+
+
+results <- model %>% evaluate(testing$text, as.numeric(testing$tag == "pos"), verbose = 0)
+results
+
+testing$tag<-as.factor(testing$tag)
+
+testing$tag<-as.numeric(testing$tag)
+
+testing$tag<-testing$tag-1
+testing$tag<-as.factor(testing$tag)
+
+
+F1_Score(testing$tag, log.prediction.rd)
+```
+
