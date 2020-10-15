@@ -178,7 +178,6 @@ model %>% compile(
 ```
 
 ```{r}
-?fit
 
 model %>% fit(
   x_train, y_train,
@@ -201,6 +200,88 @@ scores <- model %>% tensorflow::evaluate(
 y_test
 
 testing$predict<-predict_classes(model, testing$tag)
+?predict_classes
+
+
+
+testing$predict<-predict_classes(model, x_test) #Predict class
+Raw_probs<-predict_proba(model, x_test) #Predict raw probabilites (prob of tweet = OFF)
+
+#testing<-testing[,1:3]
+```
+
+#CNN:
+
+```{r}
+# Embedding
+max_features = 20000
+maxlen = 100
+embedding_size = 128
+
+```
+
+```{r}
+# Convolution
+kernel_size = 5
+filters = 64
+pool_size = 4
+```
+
+```{r}
+# LSTM
+lstm_output_size = 70
+
+```
+
+```{r}
+# Training
+batch_size = 30
+epochs = 15
+```
+
+```{r}
+# Defining Model ------------------------------------------------------
+
+model <- keras_model_sequential()
+
+model %>%
+  layer_embedding(max_features, embedding_size, input_length = maxlen) %>%
+  layer_dropout(0.25) %>%
+  layer_conv_1d(
+    filters, 
+    kernel_size, 
+    padding = "valid",
+    activation = "relu",
+    strides = 1
+  ) %>%
+  layer_max_pooling_1d(pool_size) %>%
+  layer_lstm(lstm_output_size) %>%
+  layer_dense(1) %>%
+  layer_activation("sigmoid")
+
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = "adam",
+  metrics = c("accuracy","Precision","Recall")
+)
+```
+
+```{r}
+model %>% fit(
+  x_train, y_train,
+  batch_size = batch_size,
+  epochs = epochs,
+  validation_data = list(x_test, y_test)
+)
+
+scores <- model %>% tensorflow::evaluate(
+  x_test, y_test,
+  batch_size = batch_size
+)
+
+testing$predict<-predict_classes(model, x_test) #Predict class
+Raw_probs<-predict_proba(model, x_test) #Predict raw probabilites (prob of tweet = OFF)
+
 
 
 ```
