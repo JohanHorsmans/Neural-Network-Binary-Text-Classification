@@ -12,6 +12,9 @@ output: html_document
 ```{r}
 library(keras)
 library(tidyverse)
+library(pacman)
+p_load(readr, tidyverse,rsample,recipes, textrecipes, parsnip, yardstick,workflows, discrim,kernlab)
+p_load(tidyverse, stringr, tm, ggplot2, GGally, e1071, caret,stopwords, stringi, tm, SnowballC,stringr,fastmatch)
 
 ```
 
@@ -27,6 +30,30 @@ training <- loading_data("offenseval-da-training-v1.tsv") %>%
 testing<-loading_data("offenseval-da-test-v1.tsv") %>% 
           mutate(Id = id,tag = factor(subtask_a),text=tweet) %>% 
           na.omit()
+
+
+###CLEANING####
+# Remove stopwords
+testing$text<-tolower(testing$text) 
+training$text<-tolower(training$text) 
+stopwords_regex = paste(stopwords("da",source= "snowball"), collapse = '\\b|\\b')
+stopwords_regex = paste0('\\b', stopwords_regex, '\\b')
+training$text = stringr::str_replace_all(training$text, stopwords_regex, '')
+# remove numbers
+training$text <-  removeNumbers(training$text)
+# Stem words
+training$text <-  wordStem(training$text, language = "danish")
+#repeat for test data
+stopwords_regex = paste(stopwords("da",source= "snowball"), collapse = '\\b|\\b')
+stopwords_regex = paste0('\\b', stopwords_regex, '\\b')
+testing$text = stringr::str_replace_all(testing$text, stopwords_regex, '')
+# remove numbers
+testing$text <-  removeNumbers(testing$text)
+# Stem words
+testing$text <-  wordStem(testing$text, language = "danish")
+# remove punctuation
+testing$text<-removePunctuation(testing$text)
+training$text<-removePunctuation(training$text)
 
 
 training<-training[,4:6]
@@ -146,11 +173,13 @@ model %>%
 model %>% compile(
   loss = 'binary_crossentropy',
   optimizer = 'adam',
-  metrics = c('accuracy','Precision','Recall')
+  metrics = c('accuracy')
 )
 ```
 
 ```{r}
+?fit
+
 model %>% fit(
   x_train, y_train,
   batch_size = batch_size,
@@ -161,15 +190,18 @@ model %>% fit(
 ```
 
 ```{r}
-scores <- model %>% evaluate(
+scores <- model %>% tensorflow::evaluate(
   x_test, y_test,
   batch_size = batch_size
 )
 
+?evaluate
 
 
 y_test
 
 testing$predict<-predict_classes(model, testing$tag)
+
+
 ```
 
