@@ -159,6 +159,8 @@ y_test<-y_test
 y_train<-y_train
 ```
 
+##LSTM
+
 ```{r}
 model <- keras_model_sequential()
 model %>%
@@ -194,18 +196,20 @@ scores <- model %>% tensorflow::evaluate(
   batch_size = batch_size
 )
 
-?evaluate
 
 
 y_test
+x_test
 
-testing$predict<-predict_classes(model, testing$tag)
-?predict_classes
+#testing$predict<-predict_classes(model, testing$tag)
 
 
 
 testing$predict<-predict_classes(model, x_test) #Predict class
 Raw_probs<-predict_proba(model, x_test) #Predict raw probabilites (prob of tweet = OFF)
+
+testing$raw_probs_off<-predict_proba(model, x_test)
+testing$raw_probs_not<-1-testing$raw_probs_off
 
 #testing<-testing[,1:3]
 ```
@@ -218,6 +222,10 @@ max_features = 20000
 maxlen = 100
 embedding_size = 128
 
+#2nd run
+max_features = 20000
+maxlen = 100
+embedding_size = 128
 ```
 
 ```{r}
@@ -225,10 +233,19 @@ embedding_size = 128
 kernel_size = 5
 filters = 64
 pool_size = 4
+
+#2nd run
+kernel_size = 2
+filters = 32
+pool_size = 4
 ```
 
 ```{r}
 # LSTM
+lstm_output_size = 70
+
+#2nd run
+
 lstm_output_size = 70
 
 ```
@@ -237,6 +254,10 @@ lstm_output_size = 70
 # Training
 batch_size = 30
 epochs = 15
+
+#2nd run
+batch_size = 15
+epochs = 5
 ```
 
 ```{r}
@@ -258,6 +279,10 @@ model %>%
   layer_lstm(lstm_output_size) %>%
   layer_dense(1) %>%
   layer_activation("sigmoid")
+
+#Set learning rate (default 0.001)
+optimizer_adam(
+  lr = 0.001)
 
 model %>% compile(
   loss = "binary_crossentropy",
@@ -282,6 +307,75 @@ scores <- model %>% tensorflow::evaluate(
 testing$predict<-predict_classes(model, x_test) #Predict class
 Raw_probs<-predict_proba(model, x_test) #Predict raw probabilites (prob of tweet = OFF)
 
+
+
+```
+
+#Bi-directional LSTM
+
+```{r}
+# Define maximum number of input features
+max_features <- 20000
+```
+
+```{r}
+# Cut texts after this number of words
+# (among top max_features most common words)
+maxlen <- 100
+```
+
+```{r}
+batch_size <- 32
+
+```
+
+```{r}
+#Initialize model
+model <- keras_model_sequential()
+model %>%
+  # Creates dense embedding layer; outputs 3D tensor
+  # with shape (batch_size, sequence_length, output_dim)
+  layer_embedding(input_dim = max_features, 
+                  output_dim = 128, 
+                  input_length = maxlen) %>% 
+  bidirectional(layer_lstm(units = 64)) %>%
+  layer_dropout(rate = 0.5) %>% 
+  layer_dense(units = 1, activation = 'sigmoid')
+
+```
+
+```{r}
+# Try using different optimizers and different optimizer configs
+model %>% compile(
+  loss = 'binary_crossentropy',
+  optimizer = 'adam',
+  metrics = c('accuracy',"Recall","Precision")
+)
+
+#Change learning rate when something does not improve
+callback_reduce_lr_on_plateau(
+  monitor = "",
+  factor = 0.1, #How much to reduce LR
+  patience = 50, #How many epocs wiht no improvement
+  verbose = 0,
+  mode = c("auto", "min", "max"),
+  min_delta = 1e-04,
+  cooldown = 0,
+  min_lr = 0
+)
+```
+
+```{r}
+# Train model over four epochs
+model %>% fit(
+  x_train, y_train,
+  batch_size = batch_size,
+  epochs = 15,
+  validation_data = list(x_test, y_test)
+)
+
+testing$predict<-predict_classes(model, x_test) #Predict class
+Raw_probs<-predict_proba(model, x_test) #Predict raw probabilites (prob of tweet = OFF)
 
 
 ```
